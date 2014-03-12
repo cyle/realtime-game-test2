@@ -5,14 +5,6 @@ var canvas = document.getElementById("viewport");
 var other_clients = {};
 var client_userid = '';
 
-var socket = io.connect();
-
-socket.on('client-connected', function(data) {
-	console.log(data);
-	client_userid = data.id;
-});
-
-
 var engine = new BABYLON.Engine(canvas, true); // load the BABYLON engine
 var scene = new BABYLON.Scene(engine); // load the BABYLON scene, where all meshes will live
 var camera = new BABYLON.ArcRotateCamera("Camera", Math.PI/2, Math.PI/2, 35, new BABYLON.Vector3(0, 0, 0), scene);
@@ -28,11 +20,25 @@ var light0 = new BABYLON.PointLight("Omni", new BABYLON.Vector3(0, 0, 10), scene
 
 var player_origin = BABYLON.Mesh.CreateSphere("origin", 5, 1.0, scene);
 var server_origin = BABYLON.Mesh.CreateSphere("server", 5, 1.0, scene);
-server_origin.position = new BABYLON.Vector3(-2, 0, 0);
+server_origin.position = new BABYLON.Vector3(0, 0, 0);
 server_origin.material = new BABYLON.StandardMaterial("texture1", scene);
 server_origin.material.wireframe = true;
 
 scene.activeCamera.attachControl(canvas);
+
+var socket = io.connect();
+
+socket.on('client-connected', function(data) {
+	console.log(data);
+	client_userid = data.id;
+	player_origin.position = new BABYLON.Vector3(data.x, data.y, 0);
+	server_origin.position = new BABYLON.Vector3(data.x, data.y, 0);
+});
+
+socket.on('player-left', function(other_client_id) {
+	other_clients[other_client_id].ball.dispose();
+	delete other_clients[other_client_id];
+});
 
 // register game loop
 scene.registerBeforeRender(theGameLoop);
@@ -137,6 +143,21 @@ function theGameLoop() {
 		player_origin.position.y += y_dir;
 		player_origin.position.x = player_origin.position.x.toFixed(5) * 1;
 		player_origin.position.y = player_origin.position.y.toFixed(5) * 1;
+		
+		// see if we've collided with anyone!
+		if (Object.keys(other_clients).length > 0) {
+			for (var other_id in other_clients) {
+				if (circleCollision({x: player_origin.position.x, y: player_origin.position.y, r: 0.5}, {x: other_clients[other_id].ball.position.x, y: other_clients[other_id].ball.position.y, r: 0.5})) {
+					// bounce backwards from each other...
+					//console.log(client_id + ' and ' + other_client_id + ' collided!');
+					player_origin.position.x += -x_dir;
+					player_origin.position.y += -y_dir;
+					player_origin.position.x = player_origin.position.x.toFixed(5) * 1;
+					player_origin.position.y = player_origin.position.y.toFixed(5) * 1;
+				}
+			}
+		}
+		
 		client_last_position = { x: player_origin.position.x, y: player_origin.position.y };
 		//console.log('new position: ');
 		//console.log({ seq: input_seq, pos: client_last_position });
@@ -151,7 +172,7 @@ function theGameLoop() {
 	
 	// go through and show other clients
 	if (Object.keys(other_clients).length > 0) {
-		console.log('showing other clients!');
+		//console.log('showing other clients!');
 		for (var other_id in other_clients) {
 			if (other_clients[other_id].ball == undefined) {
 				other_clients[other_id].ball = BABYLON.Mesh.CreateSphere("player-"+other_clients[other_id].id, 5, 1.0, scene);
@@ -209,7 +230,7 @@ window.addEventListener("resize", function() {
 // cleanup loop
 var cleanup_position_cut_seconds = 5000; // in milliseconds, of course
 setInterval(function() {
-	console.log('cleanup!');
+	//console.log('cleanup!');
 	// go through and flush this client's position history from over cleanup_position_cut_seconds seconds ago
 	if (positions.length > 0) {
 		var where_to_cut = 0;
@@ -224,3 +245,10 @@ setInterval(function() {
 		positions.splice(0, where_to_cut);
 	}
 }, cleanup_position_cut_seconds);
+
+function circleCollision(c1, c2) {
+	var dx = c1.x - c2.x;
+	var dy = c1.y - c2.y;
+	var dist = c1.r + c2.r;
+	return ((dx * dx) + (dy * dy) <= (dist * dist));
+}
