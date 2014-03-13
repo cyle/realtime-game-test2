@@ -14,17 +14,24 @@ html, body, div, canvas {
 }
 body {
 	margin: 10px;
+	font-family: sans-serif;
+	font-size: 12px;
 }
 canvas {
 	width: 500px;
 	height: 500px;
 }
+#debug {
+	font-family: monospace;
+	font-size: 12px;
+}
 </style>
 </head>
 <body>
 <canvas id="viewport"></canvas>
-<p>WASD to move around, arrow keys or click-and-drag to move the camera a little</p>
-<p>the opaque white circle is you, the wireframe is where the server thinks you are, and the red circles are other players</p>
+<p>use WASD to move around, arrow keys or click-and-drag to move the camera a little ("c" resets the camera)</p>
+<p>the opaque green circle is you, the wireframe is where the server thinks you are, and the red circles are other players</p>
+<p>debug info: <span id="debug"></span></p>
 <script type="text/javascript" src="/socket.io/socket.io.js"></script>
 <script type="text/javascript" src="/babylon.1.9.0.js"></script>
 <script type="text/javascript" src="/client.js"></script>

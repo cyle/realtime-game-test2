@@ -155,6 +155,19 @@ setInterval(function() {
 					}
 				}
 				
+				// see if they've collided with the world!
+				// for this usage, stay between 15 and -15 in a square
+				if (clients[client_id].position.x > 15) {
+					clients[client_id].position.x = 15;
+				} else if (clients[client_id].position.x < -15) {
+					clients[client_id].position.x = -15;
+				}
+				if (clients[client_id].position.y > 15) {
+					clients[client_id].position.y = 15;
+				} else if (clients[client_id].position.y < -15) {
+					clients[client_id].position.y = -15;
+				}
+				
 				clients[client_id].positions.push({ seq: this_input.seq, pos: { x: clients[client_id].position.x, y: clients[client_id].position.y }, ct: this_input.ct, st: (new Date().getTime()) });
 				clients[client_id].latest_seq = this_input.seq;
 				clients[client_id].latest_ct = this_input.ct;

@@ -2,6 +2,9 @@
 // the canvas element is where the magic happens
 var canvas = document.getElementById("viewport");
 
+// a place for debug text
+var debug_text = document.getElementById("debug");
+
 var other_clients = {};
 var client_userid = '';
 
@@ -18,10 +21,18 @@ camera.upperBetaLimit = Math.PI * 0.66;
 	
 var light0 = new BABYLON.PointLight("Omni", new BABYLON.Vector3(0, 0, 10), scene);
 
+var bg_plane = new BABYLON.Mesh.CreatePlane("bg", 30, scene);
+bg_plane.position = new BABYLON.Vector3(0, 0, 0);
+bg_plane.rotation.y = -Math.PI;
+bg_plane.material = new BABYLON.StandardMaterial("bg-material", scene);
+bg_plane.material.diffuseTexture = new BABYLON.Texture("assets/bg/stars.jpg", scene);
+
 var player_origin = BABYLON.Mesh.CreateSphere("origin", 5, 1.0, scene);
+player_origin.material = new BABYLON.StandardMaterial("player-texture", scene);
+player_origin.material.diffuseColor = new BABYLON.Color3(0, 1, 0);;
 var server_origin = BABYLON.Mesh.CreateSphere("server", 5, 1.0, scene);
 server_origin.position = new BABYLON.Vector3(0, 0, 0);
-server_origin.material = new BABYLON.StandardMaterial("texture1", scene);
+server_origin.material = new BABYLON.StandardMaterial("server-texture", scene);
 server_origin.material.wireframe = true;
 
 scene.activeCamera.attachControl(canvas);
@@ -83,6 +94,11 @@ window.addEventListener('keyup', function(e) {
 		break;
 		case 83: // s
 		moveReverse = false;
+		break;
+		case 67: // c
+		// this resets the camera to the "center"
+		camera.alpha = Math.PI / 2;
+		camera.beta = Math.PI / 2;
 		break;
 		default:
 		//console.log('key released: ' + e.keyCode);
@@ -158,6 +174,19 @@ function theGameLoop() {
 			}
 		}
 		
+		// see if we've collided with the world!
+		// for this usage, stay between 15 and -15 in a square
+		if (player_origin.position.x > 15) {
+			player_origin.position.x = 15;
+		} else if (player_origin.position.x < -15) {
+			player_origin.position.x = -15;
+		}
+		if (player_origin.position.y > 15) {
+			player_origin.position.y = 15;
+		} else if (player_origin.position.y < -15) {
+			player_origin.position.y = -15;
+		}
+		
 		client_last_position = { x: player_origin.position.x, y: player_origin.position.y };
 		//console.log('new position: ');
 		//console.log({ seq: input_seq, pos: client_last_position });
@@ -170,13 +199,16 @@ function theGameLoop() {
 		input_seq++;
 	}
 	
+	// show current position in debug info field
+	debug_text.innerHTML = 'x: ' + player_origin.position.x + ', y: ' + player_origin.position.y;
+	
 	// go through and show other clients
 	if (Object.keys(other_clients).length > 0) {
 		//console.log('showing other clients!');
 		for (var other_id in other_clients) {
 			if (other_clients[other_id].ball == undefined) {
 				other_clients[other_id].ball = BABYLON.Mesh.CreateSphere("player-"+other_clients[other_id].id, 5, 1.0, scene);
-				other_clients[other_id].ball.material = new BABYLON.StandardMaterial("player-texture", scene);
+				other_clients[other_id].ball.material = new BABYLON.StandardMaterial("other-player-texture", scene);
 				other_clients[other_id].ball.material.diffuseColor = new BABYLON.Color3(1, 0, 0);;
 			}
 			other_clients[other_id].ball.position.x = other_clients[other_id].pos.x;
