@@ -27,3 +27,7 @@ and then run `node server.js` and go to http://localhost:4004/ to interact with 
 ## to do
 
 - refactor into object prototypes instead of a big mess of code
+
+## credit
+
+this project is heavily based on [underscorediscovery/realtime-multiplayer-in-html5](https://github.com/underscorediscovery/realtime-multiplayer-in-html5), including the blog post about it [here](http://buildnewgames.com/real-time-multiplayer/) and further reading [here](http://www.gabrielgambetta.com/fast_paced_multiplayer.html).
