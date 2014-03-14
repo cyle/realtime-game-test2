@@ -105,7 +105,9 @@ window.addEventListener('keyup', function(e) {
 	}
 });
 
-var deltaTime = 0;
+var current_time = 0; // current millisecond timestamp
+var current_tick_ms = 0; // current tick (delta) time in milliseconds
+var deltaTime = 0; // current tick (delta) time in seconds
 var speed = 5;
 
 var client_last_position;
@@ -116,7 +118,9 @@ var server_latest_seq = 0;
 // this is the pre-render update() loop
 function theGameLoop() {
 	
-	deltaTime = BABYLON.Tools.GetDeltaTime()/1000; // divide by 1000 to get per second
+	current_time = new Date().getTime();
+	current_tick_ms = BABYLON.Tools.GetDeltaTime();
+	deltaTime = current_tick_ms/1000; // divide by 1000 to get per second
 	if (deltaTime > 0.25) { // this makes deltaTime stick to above 4fps
 		deltaTime = 0.25;
 	} else if (deltaTime < 0.01) { // this makes deltaTime stick to below 100fps
@@ -154,6 +158,9 @@ function theGameLoop() {
 	}
 	
 	if (moved) {
+		
+		//console.log('doing physics for you');
+		
 		// this is for client-side prediction
 		player_origin.position.x += x_dir;
 		player_origin.position.y += y_dir;
@@ -163,6 +170,9 @@ function theGameLoop() {
 		// see if we've collided with anyone!
 		if (Object.keys(other_clients).length > 0) {
 			for (var other_id in other_clients) {
+				if (other_clients[other_id].ball == undefined) {
+					continue;
+				}
 				if (circleCollision({x: player_origin.position.x, y: player_origin.position.y, r: 0.5}, {x: other_clients[other_id].ball.position.x, y: other_clients[other_id].ball.position.y, r: 0.5})) {
 					// bounce backwards from each other...
 					//console.log(client_id + ' and ' + other_client_id + ' collided!');
@@ -190,7 +200,6 @@ function theGameLoop() {
 		client_last_position = { x: player_origin.position.x, y: player_origin.position.y };
 		//console.log('new position: ');
 		//console.log({ seq: input_seq, pos: client_last_position });
-		var current_time = (new Date().getTime());
 		positions.push( { seq: input_seq, pos: client_last_position, ct: current_time } );
 		
 		// send these inputs to the server to see what it does
@@ -199,20 +208,65 @@ function theGameLoop() {
 		input_seq++;
 	}
 	
-	// show current position in debug info field
-	debug_text.innerHTML = 'x: ' + player_origin.position.x + ', y: ' + player_origin.position.y;
-	
 	// go through and show other clients
 	if (Object.keys(other_clients).length > 0) {
-		//console.log('showing other clients!');
+		//console.log('doing physics for other players');
+		
+		// turn back time
+		current_time -= 100;
+		
 		for (var other_id in other_clients) {
+			
 			if (other_clients[other_id].ball == undefined) {
 				other_clients[other_id].ball = BABYLON.Mesh.CreateSphere("player-"+other_clients[other_id].id, 5, 1.0, scene);
 				other_clients[other_id].ball.material = new BABYLON.StandardMaterial("other-player-texture", scene);
-				other_clients[other_id].ball.material.diffuseColor = new BABYLON.Color3(1, 0, 0);;
+				other_clients[other_id].ball.material.diffuseColor = new BABYLON.Color3(1, 0, 0);
+				other_clients[other_id].ball.position.x = other_clients[other_id].positions[0].pos.x;
+				other_clients[other_id].ball.position.y = other_clients[other_id].positions[0].pos.y;
 			}
-			other_clients[other_id].ball.position.x = other_clients[other_id].pos.x;
-			other_clients[other_id].ball.position.y = other_clients[other_id].pos.y;
+			
+			var pos_length = other_clients[other_id].positions.length;
+			
+			if (pos_length == 0) {
+				continue;
+			}
+			
+			// old way -- just move them to the latest position
+			// other_clients[other_id].ball.position.x = other_clients[other_id].positions[pos_length-1].pos.x;
+			// other_clients[other_id].ball.position.y = other_clients[other_id].positions[pos_length-1].pos.y;
+			
+			// new way -- we need to move them between two old position updates
+			// find those updates and lerp between them based on where the clients' current time is between them
+			var prev_pos;
+			var next_pos;
+			for (var i = 0; i < pos_length - 1; i++) {
+				if (current_time > other_clients[other_id].positions[i].ct && current_time < other_clients[other_id].positions[i+1].ct) {
+					prev_pos = other_clients[other_id].positions[i];
+					next_pos = other_clients[other_id].positions[i+1];
+					break;
+				}
+			}
+			
+			if (prev_pos == undefined && next_pos == undefined) {
+				// move them the old fashioned way... snap to latest
+				//other_clients[other_id].ball.position.x = other_clients[other_id].positions[pos_length-1].pos.x;
+				//other_clients[other_id].ball.position.y = other_clients[other_id].positions[pos_length-1].pos.y;
+			} else {
+				// lerp between positions
+				// how far are we between current time and the previous time?
+				// what's the spatial distance between the previous position and the next one?
+				// move the other player 
+				var time_percentage = (current_time - prev_pos.ct) / (next_pos.ct - prev_pos.ct);
+				var x_distance = next_pos.pos.x - prev_pos.pos.x;
+				var y_distance = next_pos.pos.y - prev_pos.pos.y;
+				// lerp = (start + percent*(end - start));
+				other_clients[other_id].ball.position.x = prev_pos.pos.x + (x_distance * time_percentage);
+				other_clients[other_id].ball.position.y = prev_pos.pos.y + (y_distance * time_percentage);				
+			}
+			
+			// always do this
+			other_clients[other_id].ball.position.x = other_clients[other_id].ball.position.x.toFixed(5) * 1;
+			other_clients[other_id].ball.position.y = other_clients[other_id].ball.position.y.toFixed(5) * 1;
 		}
 	}
 	
@@ -238,15 +292,14 @@ socket.on('moved-latest', function(data) {
 		}
 	} else {
 		// another player!
-		console.log('another player moved!');
-		//console.log(data.id);
+		//console.log("message from server with another player's latest movement");
 		if (other_clients[data.id] == undefined) {
 			other_clients[data.id] = {};
+			other_clients[data.id].id = data.id;
+			other_clients[data.id].positions = [];
+			other_clients[data.id].ct = (new Date().getTime());
 		}
-		other_clients[data.id].seq = data.seq;
-		other_clients[data.id].pos = data.pos;
-		other_clients[data.id].id = data.id;
-		//console.log(other_clients[data.id]);
+		other_clients[data.id].positions.push({ct: (new Date().getTime()), pos: data.pos});
 	}
 });
 
@@ -263,20 +316,47 @@ window.addEventListener("resize", function() {
 var cleanup_position_cut_seconds = 5000; // in milliseconds, of course
 setInterval(function() {
 	//console.log('cleanup!');
+	var current_time = (new Date().getTime());
+	var where_to_cut = 0;
 	// go through and flush this client's position history from over cleanup_position_cut_seconds seconds ago
 	if (positions.length > 0) {
-		var where_to_cut = 0;
-		var current_time = (new Date().getTime());
 		for (var i = 0; i < positions.length; i++) {
 			if (positions[i].ct < current_time - cleanup_position_cut_seconds) {
-				//console.log('position #'+i+' is over 5 seconds old!');
 				where_to_cut = i;
 			}
 		}
 		// keep the last known position, if nothing else
 		positions.splice(0, where_to_cut);
 	}
+	// trim other clients' position counts
+	if (Object.keys(other_clients).length > 0) {
+		for (var other_id in other_clients) {
+			where_to_cut = 0; // reset this for each client
+			if (other_clients[other_id].positions.length > 0) {
+				for (var i = 0; i < other_clients[other_id].positions.length; i++) {
+					if (other_clients[other_id].positions[i].ct < current_time - cleanup_position_cut_seconds) {
+						where_to_cut = i;
+					}
+				}
+				// keep the last known position, if nothing else
+				other_clients[other_id].positions.splice(0, where_to_cut);
+			}
+		}
+	}
 }, cleanup_position_cut_seconds);
+
+// debug loop
+setInterval(function() {
+	// show stuff in debug info field
+	debug_text.innerHTML = '';
+	debug_text.innerHTML += '<p>fps: ' + BABYLON.Tools.GetFps().toPrecision(3) + '</p>';
+	debug_text.innerHTML += '<p>your pos: x: ' + player_origin.position.x + ', y: ' + player_origin.position.y + '</p>';
+	if (Object.keys(other_clients).length > 0) {
+		for (var other_id in other_clients) {
+			debug_text.innerHTML += '<p>other player pos: x: ' + other_clients[other_id].ball.position.x + ', y: ' + other_clients[other_id].ball.position.y + '</p>';
+		}
+	}
+}, 100);
 
 function circleCollision(c1, c2) {
 	var dx = c1.x - c2.x;

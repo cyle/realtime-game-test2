@@ -20,11 +20,10 @@ and then run `node server.js` and go to http://localhost:4004/ to interact with 
 - see where the server currently tracks your position as (wireframe ball)
 - movement is frame rate independent
 - client-side physics prediction for smoothness
+- client-side physics interpolation/prediction of other players' movements for smoothness
 - server tracks everyones' physics 10 times per second
 - server broadcasts updates about other players' movements 10 times per second max
 
 ## to do
 
-- client-side interpolation/prediction of other players' movements
-	- right now other players only move when you get an update from the server, causing jerky motion
 - refactor into object prototypes instead of a big mess of code

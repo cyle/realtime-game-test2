@@ -173,21 +173,22 @@ setInterval(function() {
 				clients[client_id].latest_ct = this_input.ct;
 			}
 			
-			clients[client_id].inputs = []; // we've gone through all of them, so reset
-			
 			if (new_position_updates) {
 				// send what the server thinks should be their position up to the latest sequence number
 				var latest_client_info = { id: client_id, pos: clients[client_id].position, seq: clients[client_id].latest_seq, ct: clients[client_id].latest_ct, st: (new Date().getTime()) };
 				//console.log(latest_client_info);
 				sio.sockets.emit('moved-latest', latest_client_info);
+				//console.log((new Date().getTime()) + ' processed and confirmed '+clients[client_id].inputs.length+' new inputs from ' + client_id);
 			}
+			
+			clients[client_id].inputs = []; // we've gone through all of them, so reset
 			
 		}
 	}
 	
 	
 	lastPhysicsTime = new Date();
-}, 25); // 100 = 10fps, 20 = 50fps, 15 = 66.667fps
+}, 100); // 100 = 10fps, 20 = 50fps, 15 = 66.667fps
 
 // cleanup loop
 var cleanup_position_cut_seconds = 5000; // in milliseconds, of course
